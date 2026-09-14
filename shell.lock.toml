@@ -1,0 +1,14 @@
+[lock]
+# Password card over the blurred wallpaper: near-black, gradient border at
+# rest, solid red while typing, bright red on a wrong password.
+background       = "#0a0a0c"
+background-alpha = 0.78
+text             = "#d8d8dc"
+placeholder      = "#5a5a62"
+text-error       = "#ff2a2a"
+border           = "hyprland.active-border"
+border-active    = "#e10600"
+border-error     = "#ff2a2a"
+border-alpha     = 0.9
+selection        = "#e10600"
+selection-alpha  = 0.45

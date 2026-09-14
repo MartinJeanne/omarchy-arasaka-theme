@@ -1,0 +1,16 @@
+[launcher]
+# Cold steel card: blue-grey, translucent over the blurred wallpaper,
+# gradient border like the windows, red kept for the selected row only.
+background                = "#14141a"
+background-alpha          = 0.62
+text                      = "#d8d8dc"
+border                    = "hyprland.active-border"
+border-alpha              = 0.8
+scrim                     = "#030304"
+scrim-alpha               = 0.35
+selected-background       = "#e10600"
+selected-background-alpha = 0.16
+selected-text             = "#ff2a2a"
+selected-border           = "#e10600"
+selected-border-alpha     = 0.85
+selected-border-width     = "0 0 0 2"

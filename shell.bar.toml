@@ -1,0 +1,9 @@
+[bar]
+# Arasaka crimson bar, light text; attention modules go black on it.
+background       = "#701020"
+background-alpha = 0.9
+text             = "#f2f2f4"
+active           = "#0a0a0c"
+scale-with-font  = true
+size-horizontal  = 26
+size-vertical    = 28

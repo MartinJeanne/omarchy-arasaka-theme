@@ -1,0 +1,36 @@
+# Arasaka: black steel and corporate red
+mode = "dark"
+
+accent = "#e10600"
+selection = "#3a0a0e"
+muted = "#2a2a30"
+
+background = "#0a0a0c"
+dark_background = "#060607"
+darker_background = "#030304"
+lighter_background = "#141418"
+
+foreground = "#d8d8dc"
+dark_foreground = "#5a5a62"
+light_foreground = "#9a9aa2"
+bright_foreground = "#f2f2f4"
+
+hyprland_active_border = "rgba(b80a0acc) rgba(3a0508cc) 45deg"
+hyprland_inactive_border = "rgba(1e1e2299)"
+
+red = "#e10600"
+orange = "#ff5a1f"
+yellow = "#d9a441"
+green = "#7ea37e"
+cyan = "#8ab4c8"
+blue = "#6f8fb3"
+magenta = "#c04070"
+brown = "#6b1a1a"
+
+bright_red = "#ff2a2a"
+bright_orange = "#ff7a45"
+bright_yellow = "#f0c060"
+bright_green = "#9fc49f"
+bright_cyan = "#aed0e0"
+bright_blue = "#93b0d0"
+bright_magenta = "#e06090"
