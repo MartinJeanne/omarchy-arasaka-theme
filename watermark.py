@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Arasaka watermark: emits ImageMagick MVG on stdout. Canvas 3840x2400.
 # Usage: watermark.py <cjk-black.ttf> <cjk-regular.ttf> <mono-bold.ttf> "<logo bbox: x y w h>"
-import random, sys
+import math, random, sys
 W, H = 3840, 2400
 CJK, CJKR, MONO = sys.argv[1:4]
 bx, by, bw, bh = [int(v) for v in sys.argv[4].split()]
@@ -155,14 +155,13 @@ poly([(PX0, PY0), (PX1 - ch, PY0), (PX1, PY0 + ch), (PX1, PY1), (PX0 + ch, PY1),
 out.append(f"stroke none fill '{RED}' fill-opacity 0.95 polygon {PX0},{PY0} {PX1 - ch},{PY0} {PX1},{PY0 + ch} {PX1},{PY0 + 56} {PX0},{PY0 + 56}")
 txt(PX0 + 18, PY0 + 40, 'ARASAKA // SYS.MONITOR', 28, INK)
 txt(PX1 - 120, PY0 + 40, 'v2.077', 24, INK)
-# gauges: scale + 4 framed bars with peak segment
-GY0, GY1 = 560, 1560; seg_h, gap = 24, 7; nseg = (GY1 - GY0) // (seg_h + gap)
+# gauges: tick scale (no numbers) + 4 framed bars with peak segment
+GY0, GY1 = 560, 1500; seg_h, gap = 24, 7; nseg = (GY1 - GY0) // (seg_h + gap)
 for k in range(5):
     y = GY0 + k * (GY1 - GY0) // 4
     poly([(PX0 + 30, y), (PX0 + 60, y)], col=GREY, w=2, a=0.7)
-    txt(PX0 + 30, y - 8 if k else y + 22, f"{100 - k * 25:>3}", 20, GREY, MONO, 0.8)
 random.seed(3)
-names = ['PWR', 'NET', 'SEC', 'MIL']; values = [87, 64, 93, 41]
+values = [87, 64, 93, 41]
 for g in range(4):
     x = 3330 + g * 115; w = 80
     poly([(x - 8, GY0 - 10), (x + w + 8, GY0 - 10), (x + w + 8, GY1 + 10), (x - 8, GY1 + 10)], a=0.5, w=2, close=True)
@@ -172,25 +171,69 @@ for g in range(4):
         if s_ < lit - 1: rect(x, y, x + w, y + seg_h, RED, 1.0)
         elif s_ == lit - 1: rect(x, y, x + w, y + seg_h, PEAK, 1.0)
         else: rect(x, y, x + w, y + seg_h, GREY, 0.18)
-    txt(x, GY1 + 60, names[g], 26, GREY)
-    txt(x, GY1 + 96, f"{values[g]}%", 26, RED)
-# waveform
-random.seed(5); pts = []; yv = 1760
-for i in range(0, PX1 - PX0 - 60, 12):
-    yv = max(1720, min(1800, yv + random.randint(-14, 14)))
-    pts.append((PX0 + 30 + i, yv))
-poly(pts, a=0.85, w=2)
-txt(PX0 + 30, 1715, 'UPLINK 98.2%  //  LATENCY 04ms', 22, GREY, MONO, 0.8)
-# hex readout
-random.seed(9)
-for r in range(6):
-    words = ' '.join(f"{random.randint(0, 0xFFFF):04X}" for _ in range(5))
-    txt(PX0 + 30, 1870 + r * 34, f"0x{r * 0x10:04X}  {words}", 24, RED if r == 2 else GREY, MONO, 0.85 if r == 2 else 0.6)
-# barcode
-random.seed(13); x = PX0 + 30
-while x < PX1 - 40:
-    w = random.choice([4, 4, 6, 8, 12]); rect(x, 2100, x + w, 2170, RED if random.random() < 0.7 else GREY, 0.8); x += w + random.choice([6, 8, 12])
-txt(PX0 + 30, 2200, 'ID 7A3F-9C10-E2B4  //  荒坂', 22, GREY, CJKR, 0.8)
+
+def area(pts, col, a):
+    out.append(f"stroke none fill '{col}' fill-opacity {a} polygon {' '.join(f'{x},{y}' for x, y in pts)}")
+def scope_frame(x0, y0, x1, y1, vstep=60, hstep=50):
+    # Faint scope graticule inside a thin frame.
+    for x in range(x0 + vstep, x1, vstep): poly([(x, y0), (x, y1)], col=GREY, w=1, a=0.14)
+    for y in range(y0 + hstep, y1, hstep): poly([(x0, y), (x1, y)], col=GREY, w=1, a=0.14)
+    poly([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], col=GREY, w=2, a=0.4, close=True)
+SX0, SX1 = PX0 + 30, PX1 - 30
+
+# Oscilloscope: three overlaid traces, carrier + slow wave + noise.
+OY0, OY1 = 1550, 1760; mid = (OY0 + OY1) // 2
+scope_frame(SX0, OY0, SX1, OY1)
+random.seed(5)
+pts1, pts2, pts3 = [], [], []; nz = 0
+for i, x in enumerate(range(SX0, SX1 + 1, 4)):
+    t = (x - SX0) / (SX1 - SX0)
+    env = 0.55 + 0.45 * math.sin(t * math.pi * 3)
+    pts1.append((x, int(mid + 70 * env * math.sin(t * math.pi * 22))))
+    pts2.append((x, int(mid + 45 * math.sin(t * math.pi * 4 + 1.2))))
+    nz = max(-60, min(60, nz + random.randint(-9, 9)))
+    pts3.append((x, mid + nz))
+poly(pts3, col=GREY, w=2, a=0.3)
+poly(pts2, col=PEAK, w=2, a=0.5)
+poly(pts1, a=0.9, w=2)
+poly([(SX0, mid), (SX1, mid)], col=GREY, w=1, a=0.3)
+
+# Spectrum analyser: filled curve with a few carriers, dashed peak-hold line above.
+FY0, FY1 = 1790, 1990
+scope_frame(SX0, FY0, SX1, FY1, vstep=54, hstep=50)
+random.seed(7)
+peaks = [(0.12, 0.9, 0.02), (0.31, 0.55, 0.03), (0.47, 0.75, 0.015), (0.66, 0.4, 0.04), (0.83, 0.65, 0.02)]
+spec, hold = [], []
+for x in range(SX0, SX1 + 1, 3):
+    t = (x - SX0) / (SX1 - SX0)
+    v = 0.08 + 0.06 * (1 - t) + sum(h * math.exp(-((t - c) ** 2) / (2 * w * w)) for c, h, w in peaks)
+    v = max(0.02, min(0.95, v + random.uniform(-0.04, 0.04)))
+    spec.append((x, int(FY1 - 4 - v * (FY1 - FY0 - 12))))
+    hold.append((x, int(FY1 - 4 - min(0.97, v + 0.08 + 0.05 * math.sin(t * 40)) * (FY1 - FY0 - 12))))
+area([(SX0, FY1 - 4)] + spec + [(SX1, FY1 - 4)], RED, 0.22)
+poly(spec, a=0.9, w=2)
+out.append(f"stroke '{LIGHT}' stroke-width 1 stroke-opacity 0.45 stroke-dasharray 6 8 fill-opacity 0 polyline {' '.join(f'{x},{y}' for x, y in hold)}")
+out.append("stroke-dasharray none")
+
+# Bottom row: radar sweep (left) and a Lissajous figure (right).
+RY = 2105; RX = PX0 + 120; RR = 85
+for r in (RR // 3, 2 * RR // 3, RR):
+    out.append(f"stroke '{GREY}' stroke-width 2 stroke-opacity 0.45 fill-opacity 0 circle {RX},{RY} {RX + r},{RY}")
+poly([(RX - RR, RY), (RX + RR, RY)], col=GREY, w=1, a=0.35); poly([(RX, RY - RR), (RX, RY + RR)], col=GREY, w=1, a=0.35)
+a0, a1 = math.radians(-70), math.radians(-10)
+sx, sy = RX + int(RR * math.cos(a0)), RY + int(RR * math.sin(a0)); ex, ey = RX + int(RR * math.cos(a1)), RY + int(RR * math.sin(a1))
+out.append(f"stroke none fill '{RED}' fill-opacity 0.28 path 'M {RX},{RY} L {sx},{sy} A {RR},{RR} 0 0,1 {ex},{ey} Z'")
+poly([(RX, RY), (ex, ey)], a=0.95, w=2)
+random.seed(11)
+for _ in range(4):
+    ang = random.uniform(-math.pi, math.pi); rr = random.uniform(0.3, 0.9) * RR
+    bxp, byp = RX + int(rr * math.cos(ang)), RY + int(rr * math.sin(ang))
+    out.append(f"stroke none fill '{RED}' fill-opacity 0.9 circle {bxp},{byp} {bxp + 4},{byp}")
+    out.append(f"stroke '{RED}' stroke-width 1 stroke-opacity 0.5 fill-opacity 0 circle {bxp},{byp} {bxp + 10},{byp}")
+LX, LY = PX1 - 170, RY
+liss = [(int(LX + 125 * math.sin(3 * t + math.pi / 2)), int(LY + 75 * math.sin(2 * t))) for t in [i * 2 * math.pi / 240 for i in range(241)]]
+poly(liss, a=0.8, w=2, close=True)
+poly([(LX - 135, LY), (LX + 135, LY)], col=GREY, w=1, a=0.3); poly([(LX, LY - 85), (LX, LY + 85)], col=GREY, w=1, a=0.3)
 
 out.append("pop graphic-context")
 print("\n".join(out))
