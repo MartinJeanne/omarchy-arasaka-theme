@@ -8,9 +8,9 @@ bx, by, bw, bh = [int(v) for v in sys.argv[4].split()]
 RED, DARK, GREY, LIGHT, PEAK, INK = '#e10600', '#7a0008', '#9a9aa2', '#d8d8dc', '#ffb0a8', '#0a0a0c'
 out = ["push graphic-context"]
 def txt(x, y, s, size, col, font=MONO, a=1.0):
-    out.append(f"stroke none fill '{col}' fill-opacity {a} font '{font}' font-size {size} text {x},{y} '{s}'")
+    out.append(f"stroke none stroke-opacity 0 fill '{col}' fill-opacity {a} font '{font}' font-size {size} text {x},{y} '{s}'")
 def rect(x0, y0, x1, y1, col, a=1.0):
-    out.append(f"stroke none fill '{col}' fill-opacity {a} rectangle {x0},{y0} {x1},{y1}")
+    out.append(f"stroke none stroke-opacity 0 fill '{col}' fill-opacity {a} rectangle {x0},{y0} {x1},{y1}")
 def poly(pts, col=RED, w=3, a=0.9, close=False):
     kind = 'polygon' if close else 'polyline'
     out.append(f"stroke '{col}' stroke-width {w} stroke-opacity {a} fill-opacity 0 {kind} {' '.join(f'{x},{y}' for x, y in pts)}")
@@ -22,7 +22,7 @@ def chip(x0, y0, w, h, pins, pitch, label, sub, sides='lr', a=0.85, pin_len=18, 
     # IC footprint: dark body, red outline, pin-1 dot, pins on the given sides.
     # Returns the pin coordinates per side so traces can land on them.
     out.append(f"stroke '{RED}' stroke-width 2 stroke-opacity {a} fill '{INK}' fill-opacity 0.85 rectangle {x0},{y0} {x0 + w},{y0 + h}")
-    out.append(f"stroke none fill '{RED}' fill-opacity {a} circle {x0 + 13},{y0 + 13} {x0 + 17},{y0 + 13}")
+    out.append(f"stroke none stroke-opacity 0 fill '{RED}' fill-opacity {a} circle {x0 + 13},{y0 + 13} {x0 + 17},{y0 + 13}")
     ys = [y0 + h // 2 - (pins - 1) * pitch // 2 + i * pitch for i in range(pins)]
     xs = [x0 + w // 2 - (pins - 1) * pitch // 2 + i * pitch for i in range(pins)]
     res = {}
@@ -46,7 +46,7 @@ def fid(x, y, label, a=0.6, r=24):
     out.append(f"stroke '{GREY}' stroke-width 2 stroke-opacity {a} fill-opacity 0 circle {x},{y} {x + r},{y}")
     poly([(x - r - 14, y), (x + r + 14, y)], col=GREY, w=2, a=a)
     poly([(x, y - r - 14), (x, y + r + 14)], col=GREY, w=2, a=a)
-    out.append(f"stroke none fill '{RED}' fill-opacity {a + 0.2} circle {x},{y} {x + 6},{y}")
+    out.append(f"stroke none stroke-opacity 0 fill '{RED}' fill-opacity {a + 0.2} circle {x},{y} {x + 6},{y}")
     txt(x + r + 22, y - r, label, 18, GREY, MONO, a)
 
 # Panel geometry (right side)
@@ -63,7 +63,6 @@ def clash(x, y0, y1, s):
     if x + s > 2900 and y0 < 480: return True                      # sys block + bus
     if x + s > 2840 and y1 > 1850: return True                     # bus E
     if x + s > 1560 and x < 1960 and y1 > 1900: return True        # chip U1
-    if x + s > 2780 and x < 3240 and y1 > 900 and y0 < 1320: return True  # chip U2 + bus F
     if (x < 300 or x + s > 3560) and (y0 < 280 or y1 > 2160): return True  # fiducials
     return any(abs(cx - x) < (cs + s) * 1.4 and not (y1 < cy0 or y0 > cy1) for (cx, cy0, cy1, cs) in cols)
 tries = 0
@@ -123,18 +122,6 @@ for i in range(3):
     y = 1960 + i * d
     pts = [(PX0, y), (PX0 - 160 - i * d, y), (PX0 - 260 - i * d, y + 100), (PX0 - 260 - i * d, 2280 - i * 30)]
     poly(pts, a=0.75, w=2); pad(pts[-1][0], pts[-1][1], 0.75, 9)
-# Bus F: 4 traces from chip U2 (QFP) straight into the panel's left edge.
-U2X, U2Y, U2S = 2920, 1010, 134
-u2 = chip(U2X, U2Y, U2S, U2S, 4, d, 'U2', 'NET-LINK', 'lrtb')
-for (x, y) in u2['r']:
-    poly([(x, y), (PX0, y)], a=0.75, w=2); via(x + 60, y, 0.75, 7)
-for (x, y) in u2['l']:
-    poly([(x, y), (x - 30, y)], a=0.75, w=2); pad(x - 36, y, 0.75, 6)
-for (x, y) in u2['t']:
-    poly([(x, y), (x, y - 28)], a=0.75, w=2); pad(x, y - 34, 0.75, 6)
-for (x, y) in u2['b']:
-    poly([(x, y), (x, y + 28)], a=0.75, w=2); pad(x, y + 34, 0.75, 6)
-txt(U2X + U2S + 40, U2Y - 50, 'BUS_F  x4', 20, GREY, MONO, 0.7)
 # Fiducials in the four corners.
 fid(150, 160, 'FID1'); fid(3690, 160, 'FID2'); fid(150, 2280, 'FID3'); fid(3690, 2280, 'FID4')
 # Silkscreen labels on the buses.
@@ -151,7 +138,7 @@ rect(2980, 380, 3820, 392, RED)
 ch = 40  # chamfer
 poly([(PX0, PY0), (PX1 - ch, PY0), (PX1, PY0 + ch), (PX1, PY1), (PX0 + ch, PY1), (PX0, PY1 - ch)], a=0.75, w=2, close=True)
 # header bar with cut corner, black text on red
-out.append(f"stroke none fill '{RED}' fill-opacity 0.95 polygon {PX0},{PY0} {PX1 - ch},{PY0} {PX1},{PY0 + ch} {PX1},{PY0 + 56} {PX0},{PY0 + 56}")
+out.append(f"stroke none stroke-opacity 0 fill '{RED}' fill-opacity 0.95 polygon {PX0},{PY0} {PX1 - ch},{PY0} {PX1},{PY0 + ch} {PX1},{PY0 + 56} {PX0},{PY0 + 56}")
 txt(PX0 + 18, PY0 + 40, 'ARASAKA // SYS.MONITOR', 28, LIGHT)
 txt(PX1 - 120, PY0 + 40, 'v2.077', 24, LIGHT)
 # gauges: tick scale (no numbers) + 4 framed bars with peak segment
@@ -172,7 +159,7 @@ for g in range(4):
         else: rect(x, y, x + w, y + seg_h, GREY, 0.18)
 
 def area(pts, col, a):
-    out.append(f"stroke none fill '{col}' fill-opacity {a} polygon {' '.join(f'{x},{y}' for x, y in pts)}")
+    out.append(f"stroke none stroke-opacity 0 fill '{col}' fill-opacity {a} polygon {' '.join(f'{x},{y}' for x, y in pts)}")
 def scope_frame(x0, y0, x1, y1, vstep=60, hstep=50):
     # Faint scope graticule inside a thin frame.
     for x in range(x0 + vstep, x1, vstep): poly([(x, y0), (x, y1)], col=GREY, w=1, a=0.14)
@@ -221,13 +208,13 @@ for r in (RR // 3, 2 * RR // 3, RR):
 poly([(RX - RR, RY), (RX + RR, RY)], col=GREY, w=1, a=0.35); poly([(RX, RY - RR), (RX, RY + RR)], col=GREY, w=1, a=0.35)
 a0, a1 = math.radians(-70), math.radians(-10)
 sx, sy = RX + int(RR * math.cos(a0)), RY + int(RR * math.sin(a0)); ex, ey = RX + int(RR * math.cos(a1)), RY + int(RR * math.sin(a1))
-out.append(f"stroke none fill '{RED}' fill-opacity 0.28 path 'M {RX},{RY} L {sx},{sy} A {RR},{RR} 0 0,1 {ex},{ey} Z'")
+out.append(f"stroke none stroke-opacity 0 fill '{RED}' fill-opacity 0.28 path 'M {RX},{RY} L {sx},{sy} A {RR},{RR} 0 0,1 {ex},{ey} Z'")
 poly([(RX, RY), (ex, ey)], a=0.95, w=2)
 random.seed(11)
 for _ in range(4):
     ang = random.uniform(-math.pi, math.pi); rr = random.uniform(0.3, 0.9) * RR
     bxp, byp = RX + int(rr * math.cos(ang)), RY + int(rr * math.sin(ang))
-    out.append(f"stroke none fill '{RED}' fill-opacity 0.9 circle {bxp},{byp} {bxp + 4},{byp}")
+    out.append(f"stroke none stroke-opacity 0 fill '{RED}' fill-opacity 0.9 circle {bxp},{byp} {bxp + 4},{byp}")
     out.append(f"stroke '{RED}' stroke-width 1 stroke-opacity 0.5 fill-opacity 0 circle {bxp},{byp} {bxp + 10},{byp}")
 LX, LY = PX1 - 170, RY
 liss = [(int(LX + 125 * math.sin(3 * t + math.pi / 2)), int(LY + 75 * math.sin(2 * t))) for t in [i * 2 * math.pi / 240 for i in range(241)]]
