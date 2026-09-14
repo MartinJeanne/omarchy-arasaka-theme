@@ -18,6 +18,36 @@ def via(x, y, a=0.9, r=11):
     out.append(f"stroke '{RED}' stroke-width 3 stroke-opacity {a} fill '{INK}' fill-opacity 0.9 circle {x},{y} {x + r},{y}")
 def pad(x, y, a=0.9, s=11):
     rect(x - s, y - s, x + s, y + s, RED, a)
+def chip(x0, y0, w, h, pins, pitch, label, sub, sides='lr', a=0.85, pin_len=22, pin_w=10):
+    # IC footprint: dark body, red outline, pin-1 dot, pins on the given sides.
+    # Returns the pin coordinates per side so traces can land on them.
+    out.append(f"stroke '{RED}' stroke-width 2 stroke-opacity {a} fill '{INK}' fill-opacity 0.85 rectangle {x0},{y0} {x0 + w},{y0 + h}")
+    out.append(f"stroke none fill '{RED}' fill-opacity {a} circle {x0 + 16},{y0 + 16} {x0 + 21},{y0 + 16}")
+    ys = [y0 + h // 2 - (pins - 1) * pitch // 2 + i * pitch for i in range(pins)]
+    xs = [x0 + w // 2 - (pins - 1) * pitch // 2 + i * pitch for i in range(pins)]
+    res = {}
+    if 'l' in sides:
+        for y in ys: rect(x0 - pin_len, y - pin_w // 2, x0, y + pin_w // 2, RED, a)
+        res['l'] = [(x0 - pin_len, y) for y in ys]
+    if 'r' in sides:
+        for y in ys: rect(x0 + w, y - pin_w // 2, x0 + w + pin_len, y + pin_w // 2, RED, a)
+        res['r'] = [(x0 + w + pin_len, y) for y in ys]
+    if 't' in sides:
+        for x in xs: rect(x - pin_w // 2, y0 - pin_len, x + pin_w // 2, y0, RED, a)
+        res['t'] = [(x, y0 - pin_len) for x in xs]
+    if 'b' in sides:
+        for x in xs: rect(x - pin_w // 2, y0 + h, x + pin_w // 2, y0 + h + pin_len, RED, a)
+        res['b'] = [(x, y0 + h + pin_len) for x in xs]
+    txt(x0 + w - 16 - 24 * len(label) * 0.6, y0 + 30, label, 24, RED, MONO, a)
+    txt(x0 + 16, y0 + h - 18, sub, 20, GREY, MONO, 0.8)
+    return res
+def fid(x, y, label, a=0.6, r=24):
+    # Fiducial: crosshair in a circle with a red center dot, like PCB alignment marks.
+    out.append(f"stroke '{GREY}' stroke-width 2 stroke-opacity {a} fill-opacity 0 circle {x},{y} {x + r},{y}")
+    poly([(x - r - 14, y), (x + r + 14, y)], col=GREY, w=2, a=a)
+    poly([(x, y - r - 14), (x, y + r + 14)], col=GREY, w=2, a=a)
+    out.append(f"stroke none fill '{RED}' fill-opacity {a + 0.2} circle {x},{y} {x + 6},{y}")
+    txt(x + r + 22, y - r, label, 18, GREY, MONO, a)
 
 # Panel geometry (right side)
 PX0, PX1, PY0, PY1 = 3230, 3800, 430, 2220
@@ -32,6 +62,9 @@ def clash(x, y0, y1, s):
     if x + s > PX0 - 60 and y1 > 250: return True                  # panel
     if x + s > 2900 and y0 < 480: return True                      # sys block + bus
     if x + s > 2840 and y1 > 1850: return True                     # bus E
+    if x + s > 1560 and x < 1960 and y1 > 1900: return True        # chip U1
+    if x + s > 2780 and x < 3240 and y1 > 900 and y0 < 1320: return True  # chip U2 + bus F
+    if (x < 300 or x + s > 3560) and (y0 < 280 or y1 > 2160): return True  # fiducials
     return any(abs(cx - x) < (cs + s) * 1.4 and not (y1 < cy0 or y0 > cy1) for (cx, cy0, cy1, cs) in cols)
 tries = 0
 while len(cols) < 34 and tries < 8000:
@@ -59,12 +92,16 @@ txt(bx, y2 + 40, 'PCB REV 2.077  //  NIGHT CITY  //  J1', 22, GREY, MONO, 0.8)
 
 # ---- PCB traces ----
 d = 26  # trace pitch
-# Bus A: 5 traces leaving the tagline to the right, 45deg down, staggered pads.
-ya = y2 + 110
+# Bus A: 5 traces leaving the tagline to the right, 45deg down, into chip U1.
+ya = y2 + 110; run = 140
+U1X, U1W, U1H = bx + 1290, 230, 160
+u1 = chip(U1X, ya + run - 28, U1W, U1H, 5, d, 'U1', 'SEC-CTRL 7A3F', 'lr')
 for i in range(5):
-    y = ya + i * d; xa = bx + 760 - i * d; run = 140
-    pts = [(bx, y), (xa, y), (xa + run, y + run), (xa + run + 420 - i * 70, y + run)]
-    poly(pts, a=0.85); via(pts[0][0], pts[0][1], 0.85); pad(pts[-1][0], pts[-1][1], 0.85)
+    y = ya + i * d; xa = bx + 760 - i * d
+    pts = [(bx, y), (xa, y), (xa + run, y + run), u1['l'][i]]
+    poly(pts, a=0.85); via(pts[0][0], pts[0][1], 0.85)
+for (x, y) in u1['r']:
+    poly([(x, y), (x + 50, y)], a=0.85); pad(x + 58, y, 0.85, 8)
 # Bus B: 3 traces from the left rail into the logo top edge, with vias.
 for i in range(3):
     y = 1180 + i * d
@@ -86,6 +123,20 @@ for i in range(3):
     y = 1960 + i * d
     pts = [(PX0, y), (PX0 - 160 - i * d, y), (PX0 - 260 - i * d, y + 100), (PX0 - 260 - i * d, 2280 - i * 30)]
     poly(pts, a=0.75, w=2); pad(pts[-1][0], pts[-1][1], 0.75, 9)
+# Bus F: 5 traces from chip U2 (QFP) straight into the panel's left edge.
+U2X, U2Y, U2S = 2880, 990, 176
+u2 = chip(U2X, U2Y, U2S, U2S, 5, d, 'U2', 'NET-LINK', 'lrtb')
+for (x, y) in u2['r']:
+    poly([(x, y), (PX0, y)], a=0.75, w=2); via(x + 60, y, 0.75, 7)
+for (x, y) in u2['l']:
+    poly([(x, y), (x - 40, y)], a=0.75, w=2); pad(x - 48, y, 0.75, 7)
+for (x, y) in u2['t']:
+    poly([(x, y), (x, y - 36)], a=0.75, w=2); pad(x, y - 44, 0.75, 7)
+for (x, y) in u2['b']:
+    poly([(x, y), (x, y + 36)], a=0.75, w=2); pad(x, y + 44, 0.75, 7)
+txt(U2X + U2S + 40, U2Y - 60, 'BUS_F  x5', 20, GREY, MONO, 0.7)
+# Fiducials in the four corners.
+fid(150, 160, 'FID1'); fid(3690, 160, 'FID2'); fid(150, 2280, 'FID3'); fid(3690, 2280, 'FID4')
 # Silkscreen labels on the buses.
 txt(bx + 20, ya - 14, 'BUS_A  x5', 20, GREY, MONO, 0.7)
 txt(110, 1160, 'J2', 20, GREY, MONO, 0.7)
